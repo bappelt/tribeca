@@ -21,8 +21,12 @@ export class CryptsyOrderGateway implements Interfaces.IOrderEntryGateway {
 
     sendOrder(order: Models.BrokeredOrder): Models.OrderGatewayActionReport {
         this.apiClient.createOrder(order, (status) => {
+          status.orderId = order.orderId;
+          console.log("Order Creation Status Report: " + JSON.stringify(status));
           this.OrderUpdate.trigger(status);
+          if(status.orderStatus != Models.OrderStatus.Rejected) {
             setTimeout(() => this.updateOrderStatus(status.exchangeId), 30 );
+          }
         });
         return new Models.OrderGatewayActionReport(Utils.date());
     }
@@ -38,7 +42,7 @@ export class CryptsyOrderGateway implements Interfaces.IOrderEntryGateway {
     }
 
     cancelOrder(cancel: Models.BrokeredCancel): Models.OrderGatewayActionReport {
-        this.apiClient.cancelOrder(cancel.clientOrderId, (orderID) => {
+        this.apiClient.cancelOrder(cancel.exchangeId, (orderID) => {
           var rpt: Models.OrderStatusReport = {
               exchangeId: orderID,
               orderStatus: Models.OrderStatus.Cancelled,
@@ -186,9 +190,7 @@ class CryptsyGatewayDetails implements Interfaces.IExchangeDetailsGateway {
     }
 
     private static AllPairs = [
-        new Models.CurrencyPair(Models.Currency.BTC, Models.Currency.USD),
-        new Models.CurrencyPair(Models.Currency.BTC, Models.Currency.EUR),
-        new Models.CurrencyPair(Models.Currency.BTC, Models.Currency.GBP)
+        new Models.CurrencyPair(Models.Currency.DASH, Models.Currency.BTC)
     ];
     public get supportedCurrencyPairs() {
         return CryptsyGatewayDetails.AllPairs;

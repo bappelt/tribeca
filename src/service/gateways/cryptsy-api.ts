@@ -47,7 +47,7 @@ export class CryptsyApiClient {
     hmac.update(query);
     var sign = hmac.digest('hex');
     var requestURL = this.apiHost + this.basePath + path + "?" + query;
-    console.log("requesting: " + requestURL);
+    console.log("requesting: " + method + " " + requestURL);
     var options = {
       url: requestURL,
       headers: {'Sign': sign, 'Key': this.publicKey},
@@ -158,26 +158,32 @@ export class CryptsyApiClient {
     this.makeRequest('/order?marketid=155' + '&ordertype=' + (order.side==Models.Side.Ask ? 'SELL' : 'BUY')
                           + '&quantity=' + order.quantity + '&price=' + order.price,
                         (err, response, body) => {
+                          console.log('create order response: ' + body);
                           var responseBody = JSON.parse(body);
+                          var rpt: Models.OrderStatusReport = {
+                              time: Utils.date()
+                          };
                           if(responseBody.success) {
-                            var rpt: Models.OrderStatusReport = {
-                                exchangeId: responseBody.data.orderid,
-                                orderStatus: Models.OrderStatus.Working,
-                                time: Utils.date(),
-                            };
-                            callback(rpt);
+                            rpt.orderStatus = Models.OrderStatus.Working;
+                            rpt.exchangeId = responseBody.data.orderid;
+                          } else {
+                            rpt.orderStatus = Models.OrderStatus.Rejected;
+                            rpt.rejectMessage = responseBody.error[0];
                           }
+                          callback(rpt);
                         }, 'POST');
   };
 
   getOrderStatus = (orderID, callback) => {
     this.makeRequest('/order/' + orderID, (err, resp, body) => {
+      console.log("order status response: " + body);
       var responseBody = JSON.parse(body);
       var rpt: Models.OrderStatusReport = {
           orderStatus: Models.OrderStatus.Working,
           time: Utils.date(),
           exchangeId: responseBody.data.orderid
       };
+      console.log("Order Status Report: " + JSON.stringify(rpt));
       callback(rpt);
     })
   };
@@ -212,10 +218,10 @@ var config = new Config.ConfigProvider();
 var api = new CryptsyApiClient(config);
 var order = new Models.BrokeredOrder(null, Models.Side.Ask, 0.001, Models.TimeInForce.GTC, 0.09, null, null);
 // api.cancelOrder('361893728');
-api.createOrder(order, (status) => {
-  console.log("WTF: " + JSON.stringify(status));
-});
+// api.createOrder(order, (status) => {
+  // console.log("WTF: " + JSON.stringify(status));
+// });
 // api.getOrderStatus(360734305, (info) => {
 //   console.log(JSON.stringify(info));
 // });
-// api.getUserTradeHistory();
+api.getUserTradeHistory();
