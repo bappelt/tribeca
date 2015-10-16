@@ -12,6 +12,7 @@ export class CryptsyOrderGateway implements Interfaces.IOrderEntryGateway {
     OrderUpdate = new Utils.Evt<Models.OrderStatusReport>();
     ConnectChanged = new Utils.Evt<Models.ConnectivityStatus>();
     apiClient : CryptsyExchange.CryptsyApiClient;
+    openOrders: Array<string>;
 
     public cancelsByClientOrderId = false;
 
@@ -25,7 +26,10 @@ export class CryptsyOrderGateway implements Interfaces.IOrderEntryGateway {
           console.log("Order Creation Status Report: " + JSON.stringify(status));
           this.OrderUpdate.trigger(status);
           if(status.orderStatus != Models.OrderStatus.Rejected) {
-            setTimeout(() => this.updateOrderStatus(status.exchangeId), 30 );
+            this.openOrders.push(status.exchangeId);
+            var now = new Date().getTime()/1000;
+            setTimeout(() => this.updateOrderStatus(status.exchangeId), 30000 );
+            setTimeout(() => this.pollForOrderTrades(status.exchangeId, now), 10000 );
           }
         });
         return new Models.OrderGatewayActionReport(Utils.date());
@@ -34,11 +38,40 @@ export class CryptsyOrderGateway implements Interfaces.IOrderEntryGateway {
     updateOrderStatus(exchangeId: string) {
       this.apiClient.getOrderStatus(exchangeId, (orderStatusReport) => {
         this.OrderUpdate.trigger(orderStatusReport);
-        if(orderStatusReport===Models.OrderStatus.Working || orderStatusReport===Models.OrderStatus.New) {
-          setTimeout(() => this.updateOrderStatus(exchangeId), 30 );
+        console.log("order status recieved: " + orderStatusReport);
+        if(orderStatusReport.orderStatus===Models.OrderStatus.Working || orderStatusReport.orderStatus===Models.OrderStatus.New) {
+          setTimeout(() => this.updateOrderStatus(exchangeId), 30000 );
+        } else {
+          console.log('order in final state: ' + exchangeId);
+          console.log(this.openOrders);
+          var index = this.openOrders.indexOf(exchangeId);
+          if(index > -1) {
+            console.log('removing from open order list');
+            this.openOrders.splice(index, 1);
+          }
         }
       });
+    }
 
+    pollForOrderTrades(exchangeId: string, startTime: number) {
+      var now = new Date().getTime()/1000;
+      this.apiClient.getUserTradesForOrder(exchangeId, startTime, (trades) => {
+        console.log("recieved trades: " + JSON.stringify(trades));
+        trades.forEach( (trade) => {
+          var rpt: Models.OrderStatusReport = {
+            exchangeId: exchangeId,
+            lastPrice: trade.tradeprice,
+            lastQuantity: trade.quantity,
+            time: Utils.date()
+          };
+          this.OrderUpdate.trigger(rpt);
+        });
+        var index = this.openOrders.indexOf(exchangeId);
+        if(index > -1) {
+          console.log('order is active, scheduling trade poll');
+          setTimeout(() => this.pollForOrderTrades(exchangeId, now), 10000);
+        }
+      });
     }
 
     cancelOrder(cancel: Models.BrokeredCancel): Models.OrderGatewayActionReport {
@@ -81,6 +114,7 @@ export class CryptsyOrderGateway implements Interfaces.IOrderEntryGateway {
 
       constructor(apiClient : CryptsyExchange.CryptsyApiClient) {
           this.apiClient = apiClient;
+          this.openOrders = [];
       }
 }
 
@@ -133,7 +167,6 @@ export class CryptsyMarketDataGateway implements Interfaces.IMarketDataGateway {
 
     constructor(apiClient : CryptsyExchange.CryptsyApiClient) {
       this.apiClient = apiClient;
-        setTimeout(() => this.ConnectChanged.trigger(Models.ConnectivityStatus.Connected), 500);
         setInterval(() => this.generateMarketData(), 30000);
 
         apiClient.getTradeHistory(155, (trades) => {
@@ -153,19 +186,6 @@ export class CryptsyMarketDataGateway implements Interfaces.IMarketDataGateway {
     private genMarketTrade = () => new Models.GatewayMarketTrade(Math.random(), Math.random(), Utils.date(), false, Models.Side.Bid);
 
     private genSingleLevel = () => new Models.MarketSide(200 + 100 * Math.random(), Math.random());
-
-    // private generateMarketData = () => {
-    //     var genSide = () => {
-    //         var s = [];
-    //         for (var x = 0; x < 5; x++) {
-    //             s.push(this.genSingleLevel());
-    //         }
-    //         return s;
-    //     };
-    //     return new Models.Market(genSide(), genSide(), Utils.date());
-    // };
-
-
 }
 
 class CryptsyGatewayDetails implements Interfaces.IExchangeDetailsGateway {

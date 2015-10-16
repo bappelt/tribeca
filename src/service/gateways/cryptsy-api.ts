@@ -178,13 +178,16 @@ export class CryptsyApiClient {
     this.makeRequest('/order/' + orderID, (err, resp, body) => {
       console.log("order status response: " + body);
       var responseBody = JSON.parse(body);
-      var rpt: Models.OrderStatusReport = {
-          orderStatus: Models.OrderStatus.Working,
+      if(responseBody.success) {
+        var orderStatus = responseBody.data.orderinfo.active ? Models.OrderStatus.Working : Models.OrderStatus.Complete;
+        var rpt: Models.OrderStatusReport = {
+          orderStatus: orderStatus,
           time: Utils.date(),
           exchangeId: responseBody.data.orderid
-      };
-      console.log("Order Status Report: " + JSON.stringify(rpt));
-      callback(rpt);
+        };
+        console.log("Order Status Report: " + JSON.stringify(rpt));
+        callback(rpt);
+      }
     })
   };
 
@@ -204,10 +207,24 @@ export class CryptsyApiClient {
     });
   }
 
-  getUserTradeHistory = () => {
-    this.makeRequest('/tradehistory', (err, response, body) => {
+  getUserTradeHistory = (start : number, callback) => {
+    this.makeRequest('/tradehistory?start=' + start, (err, response, body) => {
       console.log(body);
+      var response = JSON.parse(body);
+      if(response.success) {
+        callback(response.data);
+      }
     })
+  }
+
+  getUserTradesForOrder(exchangeOrderId : string, start : number, callback) {
+    var tradesForOrder = [];
+    this.getUserTradeHistory(start, (allTrades) => {
+      tradesForOrder = allTrades.filter((trade) => {
+        return trade.orderid.valueOf() === exchangeOrderId.valueOf();
+      })
+      callback(tradesForOrder);
+    });
   }
 }
 
@@ -216,12 +233,17 @@ export class CryptsyApiClient {
 
 var config = new Config.ConfigProvider();
 var api = new CryptsyApiClient(config);
-var order = new Models.BrokeredOrder(null, Models.Side.Ask, 0.001, Models.TimeInForce.GTC, 0.09, null, null);
+// var order = new Models.BrokeredOrder(null, Models.Side.Ask, 0.001, Models.TimeInForce.GTC, 0.09, null, null);
 // api.cancelOrder('361893728');
 // api.createOrder(order, (status) => {
   // console.log("WTF: " + JSON.stringify(status));
 // });
-// api.getOrderStatus(360734305, (info) => {
-//   console.log(JSON.stringify(info));
-// });
-api.getUserTradeHistory();
+api.getOrderStatus(360529945, (info) => {
+  console.log(JSON.stringify(info));
+});
+// api.getUserTradeHistory(0, (trades) => {
+//   console.log(JSON.stringify(trades));
+// })
+api.getUserTradesForOrder('360529945', 0, (orders) => {
+  console.log(orders);
+});
