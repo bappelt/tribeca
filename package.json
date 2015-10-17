@@ -28,6 +28,7 @@
     "moment": "^2.10.6",
     "mongodb": "^1.4.22",
     "node-uuid": "^1.4.2",
+    "pusher-node-client": "^0.0.8",
     "q": "^1.0.1",
     "request": "^2.44.0",
     "shortid": "^2.1.3",
