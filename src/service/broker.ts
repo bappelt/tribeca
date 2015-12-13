@@ -2,6 +2,10 @@
 /// <reference path="../common/models.ts" />
 /// <reference path="../common/messaging.ts" />
 /// <reference path="../../typings/tsd.d.ts" />
+/// <reference path="utils.ts"/>
+/// <reference path="interfaces.ts"/>
+/// <reference path="persister.ts"/>
+/// <reference path="messages.ts"/>
 
 import Models = require("../common/models");
 import Messaging = require("../common/messaging");
@@ -12,25 +16,7 @@ import Q = require("q");
 import Interfaces = require("./interfaces");
 import Persister = require("./persister");
 import util = require("util");
-
-export class MessagesPubisher implements Interfaces.IPublishMessages {
-    private _storedMessages : Models.Message[] = [];
-
-    constructor(private _timeProvider: Utils.ITimeProvider,
-                private _persister : Persister.IPersist<Models.Message>,
-                initMsgs : Models.Message[],
-                private _wrapped : Messaging.IPublish<Models.Message>) {
-        _.forEach(initMsgs, m => this._storedMessages.push(m));
-        _wrapped.registerSnapshot(() => _.last(this._storedMessages, 50));
-    }
-
-    public publish = (text : string) => {
-        var message = new Models.Message(text, this._timeProvider.utcNow());
-        this._wrapped.publish(message);
-        this._persister.persist(message);
-        this._storedMessages.push(message);
-    };
-}
+import Messages = require("./messages");
 
 export class MarketDataBroker implements Interfaces.IMarketDataBroker {
     MarketData = new Utils.Evt<Models.Market>();
@@ -47,7 +33,7 @@ export class MarketDataBroker implements Interfaces.IMarketDataBroker {
     constructor(private _mdGateway : Interfaces.IMarketDataGateway,
                 private _marketPublisher : Messaging.IPublish<Models.Market>,
                 private _persister: Persister.IPersist<Models.Market>,
-                private _messages : MessagesPubisher) {
+                private _messages : Messages.MessagesPubisher) {
         _marketPublisher.registerSnapshot(() => this.currentBook === null ? [] : [this.currentBook]);
 
         this._mdGateway.MarketData.on(this.handleMarketData);
@@ -126,7 +112,7 @@ export class OrderBroker implements Interfaces.IOrderBroker {
             timeInForce: order.timeInForce,
             orderStatus: Models.OrderStatus.New,
             exchange: exch,
-            computationalLatency: sent.sentTime.diff(order.generatedTime),
+            computationalLatency: Utils.fastDiff(sent.sentTime, order.generatedTime),
             rejectMessage: order.msg};
         this.onOrderUpdate(rpt);
 
@@ -147,7 +133,7 @@ export class OrderBroker implements Interfaces.IOrderBroker {
             price: replace.price,
             quantity: replace.quantity,
             time: sent.sentTime,
-            computationalLatency: sent.sentTime.diff(replace.generatedTime)};
+            computationalLatency: Utils.fastDiff(sent.sentTime, replace.generatedTime)};
         this.onOrderUpdate(rpt);
 
         return new Models.SentOrder(rpt.orderId);
@@ -173,7 +159,7 @@ export class OrderBroker implements Interfaces.IOrderBroker {
             orderStatus: Models.OrderStatus.Working,
             pendingCancel: true,
             time: sent.sentTime,
-            computationalLatency: sent.sentTime.diff(cancel.generatedTime)};
+            computationalLatency: Utils.fastDiff(sent.sentTime, cancel.generatedTime)};
         this.onOrderUpdate(rpt);
     };
 
@@ -236,7 +222,7 @@ export class OrderBroker implements Interfaces.IOrderBroker {
             cumQuantity > 0 ? osr.averagePrice || orig.averagePrice : undefined,
             getOrFallback(osr.liquidity, orig.liquidity),
             getOrFallback(osr.exchange, orig.exchange),
-            osr.computationalLatency,
+            getOrFallback(osr.computationalLatency, 0) + getOrFallback(orig.computationalLatency, 0),
             (typeof orig.version === "undefined") ? 0 : orig.version + 1,
             partiallyFilled,
             osr.pendingCancel,
@@ -301,7 +287,7 @@ export class OrderBroker implements Interfaces.IOrderBroker {
                 private _tradePublisher : Messaging.IPublish<Models.Trade>,
                 private _submittedOrderReciever : Messaging.IReceive<Models.OrderRequestFromUI>,
                 private _cancelOrderReciever : Messaging.IReceive<Models.OrderStatusReport>,
-                private _messages : MessagesPubisher,
+                private _messages : Messages.MessagesPubisher,
                 private _orderCache : OrderStateCache,
                 initOrders : Models.OrderStatusReport[],
                 initTrades : Models.Trade[]) {
@@ -331,12 +317,6 @@ export class OrderBroker implements Interfaces.IOrderBroker {
         this._oeGateway.ConnectChanged.on(s => {
             _messages.publish("OE gw " + Models.ConnectivityStatus[s]);
         });
-    }
-}
-
-export class PositionPersister extends Persister.Persister<Models.PositionReport> {
-    constructor(db) {
-        super(db, "pos", Persister.timeLoader, Persister.timeSaver);
     }
 }
 
@@ -375,7 +355,11 @@ export class PositionBroker implements Interfaces.IPositionBroker {
         var positionReport = new Models.PositionReport(baseAmount, quoteAmount, basePosition.heldAmount,
             quotePosition.heldAmount, baseValue, quoteValue, this._base.pair, this._base.exchange(), this._timeProvider.utcNow());
 
-        if (this._report !== null && Math.abs(positionReport.value - this._report.value) < 2e-2 && Math.abs(baseAmount - this._report.baseAmount) < 2e-2)
+        if (this._report !== null && 
+                Math.abs(positionReport.value - this._report.value) < 2e-2 && 
+                Math.abs(baseAmount - this._report.baseAmount) < 2e-2 &&
+                Math.abs(positionReport.baseHeldAmount - this._report.baseHeldAmount) < 2e-2 &&
+                Math.abs(positionReport.quoteHeldAmount - this._report.quoteHeldAmount) < 2e-2)
             return;
 
         this._log("New position report: %j", positionReport);
@@ -461,7 +445,6 @@ export class ExchangeBroker implements Interfaces.IBroker {
                 private _mdGateway : Interfaces.IMarketDataGateway,
                 private _baseGateway : Interfaces.IExchangeDetailsGateway,
                 private _oeGateway : Interfaces.IOrderEntryGateway,
-                private _posGateway : Interfaces.IPositionGateway,
                 private _connectivityPublisher : Messaging.IPublish<Models.ConnectivityStatus>) {
         this._log = Utils.log("tribeca:exchangebroker:" + this._baseGateway.name());
 

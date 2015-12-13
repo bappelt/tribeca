@@ -1,21 +1,36 @@
 /// <reference path="../../typings/tsd.d.ts" />
 /// <reference path="../common/models.ts" />
+/// <reference path="orderlist.ts"/>
+/// <reference path="trades.ts"/>
+/// <reference path="../common/messaging.ts"/>
+/// <reference path="shared_directives.ts"/>
+/// <reference path="pair.ts"/>
+/// <reference path="market-quoting.ts"/>
+/// <reference path="market-trades.ts"/>
+/// <reference path="position.ts"/>
+/// <reference path="target-base-position.ts"/>
+/// <reference path="trade-safety.ts"/>
 
 (<any>global).jQuery = require("jquery");
 import angular = require("angular");
 
 var ui_bootstrap = require("angular-ui-bootstrap");
-var bootstrap = require("../ng-grid.min");
-var ngGrid = require("../bootstrap.min");
+var ngGrid = require("../ui-grid.min");
+var bootstrap = require("../bootstrap.min");
 
 import Models = require("../common/models");
 import moment = require("moment");
-import Exchange = require("./exchange");
 import OrderList = require("./orderlist");
 import Trades = require("./trades");
 import Messaging = require("../common/messaging");
 import Shared = require("./shared_directives");
 import Pair = require("./pair");
+import MarketQuoting = require("./market-quoting");
+import MarketTrades = require("./market-trades");
+import Messages = require("./messages");
+import Position = require("./position");
+import Tbp = require("./target-base-position");
+import TradeSafety = require("./trade-safety");
 
 interface MainWindowScope extends ng.IScope {
     env : string;
@@ -106,15 +121,15 @@ var uiCtrl = ($scope : MainWindowScope,
 };
 
 var requires = ['ui.bootstrap',
-                'ngGrid',
+                'ui.grid',
                 OrderList.orderListDirective,
                 Trades.tradeListDirective,
-                Pair.marketQuotingDirective,
-                Pair.marketTradeDirective,
-                Pair.messagesDirective, 
-                Exchange.positionDirective,
-                Exchange.targetBasePositionDirective,
-                Exchange.tradeSafetyDirective,
+                MarketQuoting.marketQuotingDirective,
+                MarketTrades.marketTradeDirective,
+                Messages.messagesDirective, 
+                Position.positionDirective,
+                Tbp.targetBasePositionDirective,
+                TradeSafety.tradeSafetyDirective,
                 Shared.sharedDirectives];
 
 angular.module('projectApp', requires)

@@ -2,6 +2,7 @@
 /// <reference path="../utils.ts" />
 /// <reference path="../../common/models.ts" />
 /// <reference path="nullgw.ts" />
+///<reference path="../interfaces.ts"/>
 
 import Config = require("../config");
 import crypto = require('crypto');
@@ -211,6 +212,18 @@ class HitBtcMarketDataGateway implements Interfaces.IMarketDataGateway {
             this.ConnectChanged.trigger(Models.ConnectivityStatus.Disconnected);
         }
     };
+    
+    private onTrade = (t: MarketTrade) => {
+        var side : Models.Side = Models.Side.Unknown;
+        if (this._lastAsks.any() && this._lastBids.any()) {
+            var distance_from_bid = Math.abs(this._lastBids.max() - t.price);
+            var distance_from_ask = Math.abs(this._lastAsks.min() - t.price);
+            if (distance_from_bid < distance_from_ask) side = Models.Side.Bid;
+            if (distance_from_bid > distance_from_ask) side = Models.Side.Ask;
+        }
+        
+        this.MarketTrade.trigger(new Models.GatewayMarketTrade(t.price, t.amount, Utils.date(), false, side));
+    };
 
     _tradesClient : SocketIOClient.Socket;
      _log : Utils.Logger = Utils.log("tribeca:gateway:HitBtcMD");
@@ -231,9 +244,7 @@ class HitBtcMarketDataGateway implements Interfaces.IMarketDataGateway {
         this._log("socket.io: %s", config.GetString("HitBtcSocketIoUrl") + "/trades/" + this._symbolProvider.symbol);
         this._tradesClient = io.connect(config.GetString("HitBtcSocketIoUrl") + "/trades/" + this._symbolProvider.symbol);
         this._tradesClient.on("connect", this.onConnectionStatusChange);
-        this._tradesClient.on("trade", (t : MarketTrade) => {
-            this.MarketTrade.trigger(new Models.GatewayMarketTrade(t.price, t.amount, Utils.date(), false, null));
-        });
+        this._tradesClient.on("trade", this.onTrade);
         this._tradesClient.on("disconnect", this.onConnectionStatusChange);
 
         request.get(
@@ -497,14 +508,19 @@ class HitBtcPositionGateway implements Interfaces.IPositionGateway {
             (err, body, resp) => {
                 try {
                     var rpts : Array<HitBtcPositionReport> = JSON.parse(resp).balance;
-
                     if (typeof rpts === 'undefined' || err) {
                         this._log("Trouble getting positions err: %o body: %o", err, body.body);
                         return;
                     }
 
                     rpts.forEach(r => {
-                        var currency = GetCurrencyEnum(r.currency_code);
+			try {
+                            var currency = GetCurrencyEnum(r.currency_code);
+			}
+			catch (e)
+			{
+			    return;
+			}
                         if (currency == null) return;
                         var position = new Models.CurrencyPosition(r.cash, r.reserved, currency);
                         this.PositionUpdate.trigger(position);
@@ -569,12 +585,12 @@ class HitBtcBaseGateway implements Interfaces.IExchangeDetailsGateway {
 }
 
 function GetCurrencyEnum(c: string) : Models.Currency {
-    switch (name.toLowerCase()) {
+    switch (c.toUpperCase()) {
         case "BTC": return Models.Currency.BTC;
         case "USD": return Models.Currency.USD;
         case "EUR": return Models.Currency.EUR;
         case "LTC": return Models.Currency.LTC;
-        default: throw new Error("Unsupported currency " + name);
+        default: throw new Error("Unsupported currency " + c);
     }
 }
 
@@ -604,9 +620,10 @@ export class HitBtc extends Interfaces.CombinedGateway {
             : new NullGateway.NullOrderGateway();
 
         // Payment actions are not permitted in demo mode -- helpful.
-        var positionGateway = config.GetString("HitBtcPullUrl").indexOf("demo") ?
-            new NullGateway.NullPositionGateway() :
-            new HitBtcPositionGateway(config);
+        var positionGateway : Interfaces.IPositionGateway = new HitBtcPositionGateway(config);
+        if (config.GetString("HitBtcPullUrl").indexOf("demo") > -1) {
+            positionGateway = new NullGateway.NullPositionGateway();
+        }
 
         super(
             new HitBtcMarketDataGateway(config, symbolProvider),

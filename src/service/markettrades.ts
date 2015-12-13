@@ -2,48 +2,39 @@
 /// <reference path="../common/models.ts" />
 /// <reference path="../common/messaging.ts" />
 /// <reference path="../../typings/tsd.d.ts" />
+/// <reference path="interfaces.ts"/>
+/// <reference path="persister.ts"/>
+/// <reference path="broker.ts"/>
+/// <reference path="web.ts"/>
+/// <reference path="quoting-engine.ts"/>
 
 import Models = require("../common/models");
 import Messaging = require("../common/messaging");
 import Utils = require("./utils");
 import Interfaces = require("./interfaces");
-import Agent = require("./arbagent");
 import _ = require("lodash");
 import P = require("./persister");
 import Broker = require("./broker");
 import mongodb = require('mongodb');
 import Web = require("./web");
+import QuotingEngine = require("./quoting-engine");
 
-var loader = (d: Models.ExchangePairMessage<Models.MarketTrade>) => {
-    if (d instanceof Models.MarketTrade) {
-        P.timeLoader(d);
-        return;
-    }
+export class MarketTradesLoaderSaver {
+    public loader = (x : Models.MarketTrade) => {
+        this._wrapped.loader(x);
+        
+        if (typeof x.quote !== "undefined" && x.quote !== null)
+            this._wrapped.loader(x.quote);
+    };
     
-    if (d.data === null) return;
-    P.timeLoader(d.data);
-
-    if (d.data.quote === null) return;
-    P.timeLoader(d.data.quote);
-};
-
-var saver = (d: Models.ExchangePairMessage<Models.MarketTrade>) => {
-    if (d instanceof Models.MarketTrade) {
-        P.timeSaver(d);
-        return;
-    }
+    public saver = (x : Models.MarketTrade) => {
+        this._wrapped.saver(x);
+        
+        if (typeof x.quote !== "undefined" && x.quote !== null)
+            this._wrapped.saver(x.quote);
+    };
     
-    if (d.data === null) return;
-    P.timeSaver(d.data);
-
-    if (d.data.quote === null) return;
-    P.timeSaver(d.data.quote);
-};
-
-export class MarketTradePersister extends P.Persister<Models.MarketTrade> {
-    constructor(db: Q.Promise<mongodb.Db>) {
-        super(db, "mt", P.timeLoader, P.timeSaver);
-    }
+    constructor(private _wrapped: P.LoaderSaver) {}
 }
 
 export class MarketTradeBroker implements Interfaces.IMarketTradeBroker {
@@ -85,16 +76,12 @@ export class MarketTradeBroker implements Interfaces.IMarketTradeBroker {
     constructor(private _mdGateway: Interfaces.IMarketDataGateway,
         private _marketTradePublisher: Messaging.IPublish<Models.MarketTrade>,
         private _mdBroker: Interfaces.IMarketDataBroker,
-        private _quoteEngine: Agent.QuotingEngine,
+        private _quoteEngine: QuotingEngine.QuotingEngine,
         private _base: Broker.ExchangeBroker,
         private _persister: P.IPersist<Models.MarketTrade>,
-        initMkTrades: Array<Models.ExchangePairMessage<Models.MarketTrade> | Models.MarketTrade>) {
-        initMkTrades.forEach(t => {
-            if (t instanceof Models.MarketTrade)
-                this.marketTrades.push(t);
-            else
-                this.marketTrades.push((<any>t).data);
-        });
+        initMkTrades: Array<Models.MarketTrade>) {
+            
+        initMkTrades.forEach(t => this.marketTrades.push(t));
         this._log("loaded %d market trades", this.marketTrades.length);
 
         _marketTradePublisher.registerSnapshot(() => _.last(this.marketTrades, 50));

@@ -5,6 +5,7 @@
     "MongoDbUrl": "mongodb://localhost:27017/tribeca",
     "WebClientUsername": "NULL",
     "WebClientPassword": "NULL",
+    "WebClientListenPort": "3000",
         
     "HitBtcPullUrl": "http://api.hitbtc.com",
     "HitBtcOrderEntryUrl": "wss://api.hitbtc.com:8080",
@@ -25,5 +26,10 @@
     "OkCoinHttpUrl": "https://www.okcoin.com/api/v1/",
     "OkCoinApiKey": "NULL",
     "OkCoinSecretKey": "NULL",
-    "OkCoinOrderDestination": "OkCoin"
+    "OkCoinOrderDestination": "OkCoin",
+    
+    "BitfinexHttpUrl": "https://api.bitfinex.com/v1",
+    "BitfinexKey": "NULL",
+    "BitfinexSecret": "NULL",
+    "BitfinexOrderDestination": "Bitfinex"
 }

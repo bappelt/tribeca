@@ -2,6 +2,11 @@
 /// <reference path="../common/messaging.ts" />
 /// <reference path="config.ts" />
 /// <reference path="utils.ts" />
+/// <reference path="statistics.ts"/>
+/// <reference path="persister.ts"/>
+/// <reference path="fair-value.ts"/>
+/// <reference path="interfaces.ts"/>
+/// <reference path="quoting-parameters.ts"/>
 
 import Models = require("../common/models");
 import Messaging = require("../common/messaging");
@@ -10,18 +15,11 @@ import Statistics = require("./statistics");
 import util = require("util");
 import _ = require("lodash");
 import Persister = require("./persister");
-import Agent = require("./arbagent");
 import mongodb = require('mongodb');
 import FairValue = require("./fair-value");
 import moment = require("moment");
 import Interfaces = require("./interfaces");
 import QuotingParameters = require("./quoting-parameters");
-
-export class RegularFairValuePersister extends Persister.Persister<Models.RegularFairValue> {
-    constructor(db: Q.Promise<mongodb.Db>) {
-        super(db, "rfv", Persister.timeLoader, Persister.timeSaver);
-    }
-}
 
 export class PositionManager {
     private _log: Utils.Logger = Utils.log("tribeca:rfv");

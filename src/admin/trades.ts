@@ -1,7 +1,6 @@
 /// <reference path="../../typings/tsd.d.ts" />
 /// <reference path="../common/models.ts" />
-/// <amd-dependency path="ui.bootstrap"/>
-/// <amd-dependency path="ngGrid"/>
+/// <reference path="shared_directives.ts"/>
 
 import angular = require("angular");
 import Models = require("../common/models");
@@ -35,11 +34,11 @@ class DisplayTrade {
     }
 }
 
-var TradesListController = ($scope : TradesScope, $log : ng.ILogService, subscriberFactory : Shared.SubscriberFactory) => {
+var TradesListController = ($scope : TradesScope, $log : ng.ILogService, subscriberFactory : Shared.SubscriberFactory, uiGridConstants: any) => {
     $scope.trade_statuses = [];
     $scope.gridOptions = {
         data: 'trade_statuses',
-        showGroupPanel: false,
+        treeRowHeaderAlwaysVisible: false,
         primaryKey: 'tradeId',
         groupsCollapsedByDefault: true,
         enableColumnResize: true,
@@ -47,7 +46,9 @@ var TradesListController = ($scope : TradesScope, $log : ng.ILogService, subscri
         rowHeight: 20,
         headerRowHeight: 20,
         columnDefs: [
-            {width: 120, field:'time', displayName:'t', cellFilter: 'momentFullDate'},
+            {width: 120, field:'time', displayName:'t', cellFilter: 'momentFullDate',
+                sortingAlgorithm: (a: moment.Moment, b: moment.Moment) => a.diff(b),
+                sort: { direction: uiGridConstants.DESC, priority: 1} },
             {width: 55, field:'price', displayName:'px', cellFilter: 'currency'},
             {width: 50, field:'quantity', displayName:'qty'},
             {width: 35, field:'side', displayName:'side'},
@@ -71,7 +72,7 @@ var TradesListController = ($scope : TradesScope, $log : ng.ILogService, subscri
 };
 
 var tradeList = () : ng.IDirective => {
-    var template = '<div><div ng-grid="gridOptions" class="table table-striped table-hover table-condensed" style="height: 180px" ></div></div>';
+    var template = '<div><div ui-grid="gridOptions" ui-grid-grouping class="table table-striped table-hover table-condensed" style="height: 180px" ></div></div>';
 
     return {
         template: template,
@@ -88,5 +89,5 @@ var tradeList = () : ng.IDirective => {
 
 export var tradeListDirective = "tradeListDirective";
 
-angular.module(tradeListDirective, ['ui.bootstrap', 'ngGrid', Shared.sharedDirectives])
+angular.module(tradeListDirective, ['ui.bootstrap', 'ui.grid', "ui.grid.grouping", Shared.sharedDirectives])
        .directive("tradeList", tradeList);

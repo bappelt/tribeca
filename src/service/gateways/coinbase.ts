@@ -2,6 +2,7 @@
 /// <reference path="../utils.ts" />
 /// <reference path="../../common/models.ts" />
 /// <reference path="nullgw.ts" />
+///<reference path="../interfaces.ts"/>
 
 import Config = require("../config");
 import request = require('request');
@@ -115,10 +116,13 @@ interface CoinbaseOrderEmitter {
 
 interface CoinbaseOrder {
     client_oid?: string;
-    price: string;
+    price?: string;
     size: string;
     product_id: string;
     stp?: string;
+    time_in_force?: string;
+    post_only?: boolean;
+    funds?: string;
 }
 
 interface CoinbaseOrderAck {
@@ -212,8 +216,8 @@ class CoinbaseOrderBook {
         priceLevelStorage.marketUpdate.size += size;
         priceLevelStorage.orders[order_id] = size;
     };
-    
-    public onReceived = (msg: CoinbaseReceived, t: moment.Moment) : boolean => {
+
+    public onReceived = (msg: CoinbaseReceived, t: moment.Moment): boolean => {
         var price = convertPrice(msg.price);
         var size = convertSize(msg.size);
         var side = convertSide(msg);
@@ -240,7 +244,7 @@ class CoinbaseOrderBook {
                 changed = true;
             }
         }
-        
+
         return changed;
     }
 
@@ -251,7 +255,7 @@ class CoinbaseOrderBook {
         this.addToOrderBook(storage, price, convertSize(msg.remaining_size), msg.order_id);
     };
 
-    public onDone = (msg: CoinbaseDone, t: moment.Moment) : boolean => {
+    public onDone = (msg: CoinbaseDone, t: moment.Moment): boolean => {
         var price = convertPrice(msg.price);
         var side = convertSide(msg);
         var storage = this.getStorage(side);
@@ -271,11 +275,11 @@ class CoinbaseOrderBook {
         if (_.isEmpty(priceLevelStorage.orders)) {
             storage.delete(price);
         }
-        
+
         return true;
     };
 
-    public onMatch = (msg: CoinbaseMatch, t: moment.Moment) : boolean => {
+    public onMatch = (msg: CoinbaseMatch, t: moment.Moment): boolean => {
         var price = convertPrice(msg.price);
         var size = convertSize(msg.size);
         var side = convertSide(msg);
@@ -296,11 +300,11 @@ class CoinbaseOrderBook {
 
             return true;
         }
-        
+
         return false;
     };
 
-    public onChange = (msg: CoinbaseChange, t: moment.Moment) : boolean => {
+    public onChange = (msg: CoinbaseChange, t: moment.Moment): boolean => {
         var price = convertPrice(msg.price);
         var side = convertSide(msg);
         var storage = this.getStorage(side);
@@ -321,18 +325,18 @@ class CoinbaseOrderBook {
 
         return true;
     };
-    
+
     public clear = () => {
         this.asks.clear();
         this.bids.clear();
     }
-    
-    public initialize = (book : CoinbaseBookStorage) => {
+
+    public initialize = (book: CoinbaseBookStorage) => {
         var add = (st, u) =>
             this.addToOrderBook(st, convertPrice(u.price), convertSize(u.size), u.id);
 
         _.forEach(book.asks, a => add(this.asks, a));
-        _.forEach(book.bids, b => add(this.bids, b));    
+        _.forEach(book.bids, b => add(this.bids, b));
     };
 }
 
@@ -359,7 +363,7 @@ class CoinbaseMarketDataGateway implements Interfaces.IMarketDataGateway {
     private onDone = (msg: CoinbaseDone, t: moment.Moment) => {
         var price = convertPrice(msg.price);
         var side = convertSide(msg);
-        
+
         if (this._orderBook.onDone(msg, t)) {
             this.onOrderBookChanged(t, side, price);
         }
@@ -369,7 +373,7 @@ class CoinbaseMarketDataGateway implements Interfaces.IMarketDataGateway {
         var price = convertPrice(msg.price);
         var size = convertSize(msg.size);
         var side = convertSide(msg);
-        
+
         if (this._orderBook.onMatch(msg, t)) {
             this.onOrderBookChanged(t, side, price);
         }
@@ -380,7 +384,7 @@ class CoinbaseMarketDataGateway implements Interfaces.IMarketDataGateway {
     private onChange = (msg: CoinbaseChange, t: moment.Moment) => {
         var price = convertPrice(msg.price);
         var side = convertSide(msg);
-        
+
         if (this._orderBook.onChange(msg, t)) {
             this.onOrderBookChanged(t, side, price);
         }
@@ -399,12 +403,12 @@ class CoinbaseMarketDataGateway implements Interfaces.IMarketDataGateway {
 
     private onOrderBookChanged = (t: moment.Moment, side: Models.Side, price: number) => {
         if (side === Models.Side.Bid) {
-            if (price < _.last(this._cachedBids).price) return;
+            if (this._cachedBids.length > 0 && price < _.last(this._cachedBids).price) return;
             else this.reevalBids();
         }
 
         if (side === Models.Side.Ask) {
-            if (price > _.last(this._cachedAsks).price) return;
+            if (this._cachedAsks.length > 0 && price > _.last(this._cachedAsks).price) return;
             else this.reevalAsks();
         }
 
@@ -554,6 +558,19 @@ class CoinbaseOrderEntryGateway implements Interfaces.IOrderEntryGateway {
             price: order.price.toString(),
             product_id: this._symbolProvider.symbol
         };
+        
+        switch (order.timeInForce) {
+            case Models.TimeInForce.GTC: 
+                break;
+            case Models.TimeInForce.FOK: 
+                o.time_in_force = "FOK";
+                break;
+            case Models.TimeInForce.IOC: 
+                o.time_in_force = "IOC";
+                break;
+            default: 
+                throw new Error("Cannot map " + Models.TimeInForce[order.timeInForce] + " to a coinbase TIF");
+        }
 
         if (order.side === Models.Side.Bid)
             this._authClient.buy(o, cb);
@@ -684,24 +701,27 @@ class CoinbaseOrderEntryGateway implements Interfaces.IOrderEntryGateway {
     }
 }
 
-
 class CoinbasePositionGateway implements Interfaces.IPositionGateway {
     _log: Utils.Logger = Utils.log("tribeca:gateway:CoinbasePG");
     PositionUpdate = new Utils.Evt<Models.CurrencyPosition>();
 
     private onTick = () => {
         this._authClient.getAccounts((err?: Error, resp?: any, data?: CoinbaseAccountInformation[]) => {
-            _.forEach(data, d => {
-                var c = GetCurrencyEnum(d.currency);
-                var rpt = new Models.CurrencyPosition(convertPrice(d.available), convertPrice(d.hold), c);
-                this.PositionUpdate.trigger(rpt);
-            });
+            try {
+                _.forEach(data, d => {
+                    var c = GetCurrencyEnum(d.currency);
+                    var rpt = new Models.CurrencyPosition(convertPrice(d.available), convertPrice(d.hold), c);
+                    this.PositionUpdate.trigger(rpt);
+                });
+            } catch (error) {
+                Utils.errorLog("Exception while downloading Coinbase positions: " + error, data)
+            }
         });
     };
 
     constructor(
-            timeProvider: Utils.ITimeProvider,
-            private _authClient: CoinbaseAuthenticatedClient) {
+        timeProvider: Utils.ITimeProvider,
+        private _authClient: CoinbaseAuthenticatedClient) {
         timeProvider.setInterval(this.onTick, moment.duration(7500));
         this.onTick();
     }
@@ -727,7 +747,7 @@ class CoinbaseBaseGateway implements Interfaces.IExchangeDetailsGateway {
     name(): string {
         return "Coinbase";
     }
-    
+
     private static AllPairs = [
         new Models.CurrencyPair(Models.Currency.BTC, Models.Currency.USD),
         new Models.CurrencyPair(Models.Currency.BTC, Models.Currency.EUR),
@@ -738,8 +758,8 @@ class CoinbaseBaseGateway implements Interfaces.IExchangeDetailsGateway {
     }
 }
 
-function GetCurrencyEnum(c: string) : Models.Currency {
-    switch (name.toLowerCase()) {
+function GetCurrencyEnum(name: string): Models.Currency {
+    switch (name.toUpperCase()) {
         case "BTC": return Models.Currency.BTC;
         case "USD": return Models.Currency.USD;
         case "EUR": return Models.Currency.EUR;
@@ -748,7 +768,7 @@ function GetCurrencyEnum(c: string) : Models.Currency {
     }
 }
 
-function GetCurrencySymbol(c: Models.Currency) : string {
+function GetCurrencySymbol(c: Models.Currency): string {
     switch (c) {
         case Models.Currency.USD: return "USD";
         case Models.Currency.GBP: return "GBP";
@@ -759,8 +779,8 @@ function GetCurrencySymbol(c: Models.Currency) : string {
 }
 
 class CoinbaseSymbolProvider {
-    public symbol : string;
-    
+    public symbol: string;
+
     constructor(pair: Models.CurrencyPair) {
         this.symbol = GetCurrencySymbol(pair.base) + "-" + GetCurrencySymbol(pair.quote);
     }
@@ -769,7 +789,7 @@ class CoinbaseSymbolProvider {
 export class Coinbase extends Interfaces.CombinedGateway {
     constructor(config: Config.IConfigProvider, orders: Interfaces.IOrderStateCache, timeProvider: Utils.ITimeProvider, pair: Models.CurrencyPair) {
         var symbolProvider = new CoinbaseSymbolProvider(pair);
-        
+
         var orderEventEmitter = new CoinbaseExchange.OrderBook(symbolProvider.symbol, config.GetString("CoinbaseWebsocketUrl"), config.GetString("CoinbaseRestUrl"), timeProvider);
         var authClient = new CoinbaseExchange.AuthenticatedClient(config.GetString("CoinbaseApiKey"),
             config.GetString("CoinbaseSecret"), config.GetString("CoinbasePassphrase"), config.GetString("CoinbaseRestUrl"));

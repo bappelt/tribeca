@@ -51,16 +51,16 @@ export class BacktestTimeProvider implements Utils.IBacktestingTimeProvider {
     private setAction  = (action: () => void, time: moment.Duration, type : TimedType) => {
         var dueTime = this._internalTime.clone().add(time);
         
-        if (dueTime.diff(this.utcNow()) < 0) {
+        if (Utils.fastDiff(dueTime, this.utcNow()) < 0) {
             return;
         }
         
         this._timeouts.push(new Timed(action, dueTime, type, time));
-        this._timeouts.sort((a, b) => a.time.diff(b.time));
+        this._timeouts.sort((a, b) => Utils.fastDiff(a.time, b.time));
     };
     
     scrollTimeTo = (time : moment.Moment) => {
-        if (time.diff(this.utcNow()) < 0) {
+        if (Utils.fastDiff(time, this.utcNow()) < 0) {
             throw new Error("Cannot reverse time!");
         }
         
@@ -68,7 +68,7 @@ export class BacktestTimeProvider implements Utils.IBacktestingTimeProvider {
             this._immediates.pop()();
         }
         
-        while (this._timeouts.length > 0 && _.first(this._timeouts).time.diff(time) < 0) {
+        while (this._timeouts.length > 0 && Utils.fastDiff(_.first(this._timeouts).time, time) < 0) {
             var evt : Timed = this._timeouts.shift();
             this._internalTime = evt.time;
             evt.action();
@@ -237,6 +237,8 @@ export class BacktestGateway implements Interfaces.IPositionGateway, Interfaces.
                 }
             }
         });
+        
+        this.recomputePosition();        
     };
 }
 
@@ -276,7 +278,7 @@ export class BacktestParameters {
     id: string;
 }
 
-export class BacktestPersister<T> implements Persister.ILoadAllByExchangeAndPair<T>, Persister.ILoadLatest<T> {
+export class BacktestPersister<T> implements Persister.ILoadAll<T>, Persister.ILoadLatest<T> {
     public load = (exchange: Models.Exchange, pair: Models.CurrencyPair, limit: number = null): Q.Promise<T[]> => {
         return this.loadAll(limit);    
     };
@@ -343,7 +345,7 @@ var backtestServer = () => {
     console.log("loaded input data...");
     
     var app = express();
-    app.use(require('body-parser').json());
+    app.use(require('body-parser').json({limit: '200mb'}));
     app.use(require("compression")());
     
     var server = app.listen(5001, () => {

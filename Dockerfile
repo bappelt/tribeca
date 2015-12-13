@@ -21,6 +21,7 @@ ENV EXCHANGE null
 ENV TradedPair BTC/USD
 ENV WebClientUsername NULL
 ENV WebClientPassword NULL
+ENV WebClientListenPort 3000
 # IP to access mongo instance. If you are on a mac, run `boot2docker ip` and replace `tribeca-mongo`.
 ENV MongoDbUrl mongodb://tribeca-mongo:27017/tribeca
 
@@ -46,6 +47,11 @@ ENV OkCoinHttpUrl https://www.okcoin.com/api/v1/
 ENV OkCoinApiKey NULL
 ENV OkCoinSecretKey NULL
 ENV OkCoinOrderDestination OkCoin
+## Bitfinex
+ENV BitfinexHttpUrl https://api.bitfinex.com/v1
+ENV BitfinexKey NULL
+ENV BitfinexSecret NULL
+ENV BitfinexOrderDestination Bitfinex
 
 # PROD - values provided for reference.
 ## HitBtc

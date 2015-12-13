@@ -59,8 +59,8 @@ export class MarketTrade implements ITimestamped {
 export enum GatewayType { MarketData, OrderEntry, Position }
 export enum Currency { USD, BTC, LTC, DASH, EUR, GBP, CNY }
 export enum ConnectivityStatus { Connected, Disconnected }
-export enum Exchange { Null, HitBtc, OkCoin, AtlasAts, BtcChina, Coinbase, Cryptsy }
-export enum Side { Bid, Ask }
+export enum Exchange { Null, HitBtc, OkCoin, AtlasAts, BtcChina, Coinbase, Bitfinex, Cryptsy }
+export enum Side { Bid, Ask, Unknown }
 export enum OrderType { Limit, Market }
 export enum TimeInForce { IOC, FOK, GTC }
 export enum OrderStatus { New, Working, Complete, Cancelled, Rejected, Other }
@@ -261,7 +261,7 @@ export class PositionReport {
                 public value: number,
                 public quoteValue: number,
                 public pair: CurrencyPair,
-                public exch: Exchange,
+                public exchange: Exchange,
                 public time: moment.Moment) {}
 }
 
