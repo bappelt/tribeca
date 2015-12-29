@@ -58,7 +58,8 @@ class MarketTradeViewModel {
     }
 
     private static round(num: number) {
-        return Math.round(num * 100) / 100;
+        //return Math.round(num * 100) / 100;
+        return num;
     }
 }
 
@@ -84,17 +85,17 @@ var MarketTradeGrid = ($scope: MarketTradeScope,
             { width: 80, field: 'time', displayName: 't', cellFilter: "momentShortDate",
                 sortingAlgorithm: (a: moment.Moment, b: moment.Moment) => a.diff(b),
                 sort: { direction: uiGridConstants.DESC, priority: 1} },
-            { width: 50, field: 'price', displayName: 'px' },
-            { width: 40, field: 'size', displayName: 'sz' },
+            { width: 75, field: 'price', displayName: 'px' },
+            { width: 75, field: 'size', displayName: 'sz' },
             { width: 40, field: 'make_side', displayName: 'ms' },
             { width: 40, field: 'qBz', displayName: 'qBz' },
             { width: 50, field: 'qB', displayName: 'qB' },
             { width: 50, field: 'qA', displayName: 'qA' },
             { width: 40, field: 'qAz', displayName: 'qAz' },
-            { width: 40, field: 'mBz', displayName: 'mBz' },
-            { width: 50, field: 'mB', displayName: 'mB' },
-            { width: 50, field: 'mA', displayName: 'mA' },
-            { width: 40, field: 'mAz', displayName: 'mAz' }
+            { width: 75, field: 'mBz', displayName: 'mBz' },
+            { width: 75, field: 'mB', displayName: 'mB' },
+            { width: 75, field: 'mA', displayName: 'mA' },
+            { width: 75, field: 'mAz', displayName: 'mAz' }
         ]
     };
 
