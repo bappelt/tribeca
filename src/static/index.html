@@ -39,19 +39,19 @@
         </tr>
         <tr class="info">
             <td>q</td>
-            <td ng-class="bidIsLive ? 'text-danger' : 'text-muted'">{{ qBidSz|number }}</td>
-            <td ng-class="bidIsLive ? 'text-danger' : 'text-muted'">{{ qBidPx|number }}</td>
-            <td>{{ fairValue|number }}</td>
-            <td ng-class="askIsLive ? 'text-danger' : 'text-muted'">{{ qAskPx|number }}</td>
-            <td ng-class="askIsLive ? 'text-danger' : 'text-muted'">{{ qAskSz|number }}</td>
+            <td ng-class="bidIsLive ? 'text-danger' : 'text-muted'">{{ qBidSz }}</td>
+            <td ng-class="bidIsLive ? 'text-danger' : 'text-muted'">{{ qBidPx }}</td>
+            <td>{{ fairValue }}</td>
+            <td ng-class="askIsLive ? 'text-danger' : 'text-muted'">{{ qAskPx }}</td>
+            <td ng-class="askIsLive ? 'text-danger' : 'text-muted'">{{ qAskSz }}</td>
         </tr>
         <tr class="active" ng-repeat="level in levels">
             <td>mkt{{ $index }}</td>
-            <td>{{ level.bidSize|number }}</td>
-            <td ng-class="level.bidClass">{{ level.bidPrice|number }}</td>
+            <td>{{ level.bidSize }}</td>
+            <td ng-class="level.bidClass">{{ level.bidPrice }}</td>
             <td></td>
-            <td ng-class="level.askClass">{{ level.askPrice|number }}</td>
-            <td>{{ level.askSize|number }}</td>
+            <td ng-class="level.askClass">{{ level.askPrice }}</td>
+            <td>{{ level.askSize }}</td>
         </tr>
     </table>
 </script>

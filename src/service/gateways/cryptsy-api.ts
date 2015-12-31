@@ -47,7 +47,7 @@ export class CryptsyApiClient {
     hmac.update(query);
     var sign = hmac.digest('hex');
     var requestURL = this.apiHost + this.basePath + path + "?" + query;
-    console.log("requesting: " + method + " " + requestURL);
+    //console.log("requesting: " + method + " " + requestURL);
     var options = {
       url: requestURL,
       headers: {'Sign': sign, 'Key': this.publicKey},
