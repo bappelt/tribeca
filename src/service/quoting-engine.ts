@@ -134,17 +134,17 @@ export class QuotingEngine {
         
         if (unrounded.askPx !== null) {
             unrounded.askPx = Utils.roundFloat(unrounded.askPx);
-            unrounded.askPx = Math.max(unrounded.bidPx + .01, unrounded.askPx);
+            unrounded.askPx = Math.max(unrounded.bidPx + .00001, unrounded.askPx);
         }
-        
+
         if (unrounded.askSz !== null) {
             unrounded.askSz = Utils.roundFloat(unrounded.askSz);
-            unrounded.askSz = Math.max(0.01, unrounded.askSz);
+            unrounded.askSz = Math.max(0.00001, unrounded.askSz);
         }
-        
+
         if (unrounded.bidSz !== null) {
             unrounded.bidSz = Utils.roundFloat(unrounded.bidSz);
-            unrounded.bidSz = Math.max(0.01, unrounded.bidSz);
+            unrounded.bidSz = Math.max(0.00001, unrounded.bidSz);
         }
 
         return unrounded;
@@ -183,6 +183,6 @@ export class QuotingEngine {
         var previousQ = sideGetter(prevTwoSided);
         if (previousQ == null && newQ != null) return newQ;
         if (Math.abs(newQ.size - previousQ.size) > 5e-3) return newQ;
-        return Math.abs(newQ.price - previousQ.price) < .009999 ? previousQ : newQ;
+        return Math.abs(newQ.price - previousQ.price) < .00000009999 ? previousQ : newQ;
     }
 }
