@@ -127,7 +127,11 @@ export class CryptsyPositionGateway implements Interfaces.IPositionGateway {
         var positions = this.apiClient.getPositions((positions) => {
             for (var currency in Models.Currency) {
                 if (Models.Currency.hasOwnProperty(currency) && !/^\d+$/.test(currency)) {
-                    var position = new Models.CurrencyPosition(positions[currency], 0, Models.Currency[currency]);
+                    var position = new Models.CurrencyPosition(
+                        positions[currency]['available'],
+                        positions[currency]['held'],
+                        Models.Currency[currency]
+                    );
                     this.PositionUpdate.trigger(position);
                 }
             }
